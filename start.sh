@@ -20,6 +20,8 @@ fi
 
 # Install Kokoro TTS dependencies
 echo "🐍 Installing Kokoro TTS dependencies..."
+
+# First install what we know we need
 pip install --no-cache-dir \
     torch \
     torchaudio \
@@ -27,12 +29,22 @@ pip install --no-cache-dir \
     librosa \
     soundfile \
     numpy \
-    scipy \
-    "kokoro-onnx>=0.4.4" \
-    ebooklib \
-    PyMuPDF \
-    beautifulsoup4 \
-    lxml
+    scipy
+
+# Then let Kokoro install its own complete requirements
+if [ -f "requirements.txt" ]; then
+    echo "📋 Installing from Kokoro's requirements.txt..."
+    pip install --no-cache-dir -r requirements.txt || echo "Some Kokoro dependencies failed, continuing..."
+else
+    echo "⚠️ No requirements.txt found, installing common dependencies..."
+    pip install --no-cache-dir \
+        "kokoro-onnx>=0.4.4" \
+        ebooklib \
+        PyMuPDF \
+        beautifulsoup4 \
+        lxml \
+        pymupdf4llm
+fi
 
 # Install a dummy sounddevice that won't crash
 echo "🎵 Installing dummy sounddevice for headless operation..."
