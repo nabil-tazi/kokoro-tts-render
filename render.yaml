@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: kokoro-tts-api
+    env: python
+    region: oregon # Choose: oregon, frankfurt, ohio, singapore
+    plan: starter # or: starter, standard, pro, pro plus
+    buildCommand: "chmod +x start.sh && ./start.sh && pip install -r requirements.txt"
+    startCommand: "python app.py"
+    healthCheckPath: "/health"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.7
+      - key: PORT
+        value: 8000
+      - key: PYTHONUNBUFFERED
+        value: 1
+    # Resource allocation
+    disk:
+      name: kokoro-storage
+      mountPath: /data
+      sizeGB: 5 # Enough for models and temp files
