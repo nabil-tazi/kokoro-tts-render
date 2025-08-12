@@ -3,13 +3,8 @@ set -e
 
 echo "🚀 Setting up Kokoro TTS on Render..."
 
-# Update package lists
-echo "📦 Updating package lists..."
-apt-get update
-
-# Install system dependencies
-echo "📦 Installing system dependencies..."
-apt-get install -y wget curl git ffmpeg build-essential
+# Skip apt-get operations on Render (they're not allowed)
+echo "📦 Skipping system package installation (using Render's base image)..."
 
 # Install our API dependencies first (minimal set)
 echo "🐍 Installing API server dependencies..."
@@ -40,7 +35,6 @@ echo "🧠 Downloading AI models (this may take a few minutes)..."
 # Download voices file (binary format, preferred)
 if [ ! -f "voices-v1.0.bin" ]; then
     echo "Downloading voices file..."
-    wget --timeout=300 --tries=3 -O voices-v1.0.bin https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.0.bin || \
     curl -L -o voices-v1.0.bin https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/voices-v1.0.bin
 else
     echo "Voices file already exists"
@@ -49,7 +43,6 @@ fi
 # Download main model file
 if [ ! -f "kokoro-v1.0.onnx" ]; then
     echo "Downloading main model file..."
-    wget --timeout=300 --tries=3 -O kokoro-v1.0.onnx https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/kokoro-v1.0.onnx || \
     curl -L -o kokoro-v1.0.onnx https://github.com/nazdridoy/kokoro-tts/releases/download/v1.0.0/kokoro-v1.0.onnx
 else
     echo "Model file already exists"
@@ -83,4 +76,4 @@ cd ..
 echo "✅ Setup complete!"
 echo "📁 Directory structure:"
 ls -la kokoro-tts/ | head -10
-echo "🎉 Starting API server..."
+echo "🎉 Setup finished, ready for app start..."
