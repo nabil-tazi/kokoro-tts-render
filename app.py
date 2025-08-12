@@ -17,16 +17,54 @@ import logging
 import asyncio
 from typing import Optional
 import uvicorn
+from contextlib import asynccontextmanager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Global variables
+KOKORO_PATH = Path("/opt/render/project/src/kokoro-tts")
+OUTPUT_DIR = Path("/tmp/tts_output")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events"""
+    # Startup
+    logger.info("Starting Kokoro TTS API...")
+    
+    # Check if kokoro-tts script exists
+    kokoro_script = KOKORO_PATH / "kokoro-tts"
+    if kokoro_script.exists():
+        logger.info("✅ Kokoro TTS script found")
+    else:
+        logger.warning("⚠️ Kokoro TTS script not found, will try current directory")
+    
+    # Check for model files
+    model_file = KOKORO_PATH / "kokoro-v1.0.onnx"
+    voices_file = KOKORO_PATH / "voices-v1.0.bin"
+    
+    if model_file.exists():
+        logger.info("✅ Model file found")
+    else:
+        logger.warning("⚠️ Model file not found in expected location")
+        
+    if voices_file.exists():
+        logger.info("✅ Voices file found")
+    else:
+        logger.warning("⚠️ Voices file not found in expected location")
+    
+    yield
+    # Shutdown
+    logger.info("Shutting down Kokoro TTS API...")
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title="Kokoro TTS API",
     description="High-quality text-to-speech using Kokoro TTS",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware
@@ -50,37 +88,6 @@ class TTSResponse(BaseModel):
     message: str
     audio_url: Optional[str] = None
     error: Optional[str] = None
-
-# Global variables
-KOKORO_PATH = Path("/opt/render/project/src/kokoro-tts")
-OUTPUT_DIR = Path("/tmp/tts_output")
-OUTPUT_DIR.mkdir(exist_ok=True)
-
-@app.on_startup
-async def startup_event():
-    """Check if Kokoro TTS is properly installed"""
-    logger.info("Starting Kokoro TTS API...")
-    
-    # Check if kokoro-tts script exists
-    kokoro_script = KOKORO_PATH / "kokoro-tts"
-    if kokoro_script.exists():
-        logger.info("✅ Kokoro TTS script found")
-    else:
-        logger.warning("⚠️ Kokoro TTS script not found, will try current directory")
-    
-    # Check for model files
-    model_file = KOKORO_PATH / "kokoro-v1.0.onnx"
-    voices_file = KOKORO_PATH / "voices-v1.0.bin"
-    
-    if model_file.exists():
-        logger.info("✅ Model file found")
-    else:
-        logger.warning("⚠️ Model file not found in expected location")
-        
-    if voices_file.exists():
-        logger.info("✅ Voices file found")
-    else:
-        logger.warning("⚠️ Voices file not found in expected location")
 
 def find_kokoro_script():
     """Find the kokoro-tts script in various possible locations"""
