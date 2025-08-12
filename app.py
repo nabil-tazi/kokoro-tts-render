@@ -146,14 +146,14 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
         
         logger.info(f"Output file will be: {output_file}")
         
-        # Prepare command
+        # Prepare command with correct syntax (space-separated, not equals)
         cmd = [
             str(kokoro_script),
             input_file,
             str(output_file),
-            f"--voice={voice}",
-            f"--speed={speed}",
-            f"--format={output_format}"
+            "--voice", voice,
+            "--speed", str(speed),
+            "--format", output_format
         ]
         
         logger.info(f"Running command: {' '.join(cmd)}")
