@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global variables
-KOKORO_PATH = Path("/opt/render/project/src/kokoro-tts")
+KOKORO_PATH = Path("/root/kokoro-tts")  # Updated for VM
 OUTPUT_DIR = Path("/tmp/tts_output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
@@ -92,10 +92,12 @@ class TTSResponse(BaseModel):
 def find_kokoro_script():
     """Find the kokoro-tts script in various possible locations"""
     possible_paths = [
-        Path("/opt/render/project/src/kokoro-tts"),
+        Path("/root/kokoro-tts"),  # VM location
+        Path("../kokoro-tts"),    # Relative path
+        Path("./kokoro-tts"),     # Current directory
+        Path("/opt/render/project/src/kokoro-tts"),  # Keep Render path as fallback
         Path("/opt/render/project/src"),
         Path("."),
-        Path("./kokoro-tts"),
         Path("kokoro-tts"),  # Relative path
         Path.cwd() / "kokoro-tts",  # Current working directory
     ]
