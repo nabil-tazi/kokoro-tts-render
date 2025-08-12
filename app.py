@@ -131,14 +131,20 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
         if not kokoro_script:
             return False, "Kokoro TTS script not found", None
         
+        logger.info(f"Using Kokoro script at: {kokoro_script}")
+        
         # Create temp input file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
             f.write(text)
             input_file = f.name
         
+        logger.info(f"Created input file: {input_file}")
+        
         # Create output file path
         output_filename = f"tts_{uuid.uuid4().hex[:8]}.{output_format}"
         output_file = OUTPUT_DIR / output_filename
+        
+        logger.info(f"Output file will be: {output_file}")
         
         # Prepare command
         cmd = [
@@ -150,9 +156,16 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
             f"--format={output_format}"
         ]
         
-        logger.info(f"Running: {' '.join(cmd)}")
+        logger.info(f"Running command: {' '.join(cmd)}")
+        logger.info(f"Working directory: {kokoro_script.parent}")
         
-        # Run the command with timeout (no special environment needed now)
+        # Check if model files exist
+        model_file = kokoro_script.parent / "kokoro-v1.0.onnx"
+        voices_file = kokoro_script.parent / "voices-v1.0.bin"
+        logger.info(f"Model file exists: {model_file.exists()}")
+        logger.info(f"Voices file exists: {voices_file.exists()}")
+        
+        # Run the command with timeout and capture all output
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -161,25 +174,33 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
             cwd=kokoro_script.parent
         )
         
+        logger.info(f"Command completed with return code: {result.returncode}")
+        logger.info(f"STDOUT: {result.stdout}")
+        logger.info(f"STDERR: {result.stderr}")
+        
         # Clean up input file
         os.unlink(input_file)
         
         if result.returncode == 0:
             if output_file.exists():
-                logger.info(f"✅ TTS generation successful: {output_file}")
+                file_size = output_file.stat().st_size
+                logger.info(f"✅ TTS generation successful: {output_file} ({file_size} bytes)")
                 return True, "TTS generation successful", str(output_file)
             else:
                 logger.error("TTS command succeeded but output file not found")
                 return False, "Output file not created", None
         else:
-            logger.error(f"TTS command failed: {result.stderr}")
-            return False, f"TTS generation failed: {result.stderr}", None
+            error_msg = f"Command failed with code {result.returncode}. STDERR: {result.stderr}. STDOUT: {result.stdout}"
+            logger.error(error_msg)
+            return False, error_msg, None
             
     except subprocess.TimeoutExpired:
         logger.error("TTS generation timed out")
         return False, "TTS generation timed out", None
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False, f"Unexpected error: {str(e)}", None
 
 @app.get("/")
@@ -283,6 +304,7 @@ async def list_voices():
 # Run the app
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting server on port {port}")
     uvicorn.run(
         "app:app",
         host="0.0.0.0",
