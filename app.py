@@ -96,12 +96,28 @@ def find_kokoro_script():
         Path("/opt/render/project/src"),
         Path("."),
         Path("./kokoro-tts"),
+        Path("kokoro-tts"),  # Relative path
+        Path.cwd() / "kokoro-tts",  # Current working directory
     ]
+    
+    logger.info(f"Looking for kokoro-tts script. Current directory: {Path.cwd()}")
     
     for path in possible_paths:
         script_path = path / "kokoro-tts"
+        logger.info(f"Checking: {script_path}")
         if script_path.exists():
+            logger.info(f"✅ Found kokoro-tts at: {script_path}")
             return script_path
+        else:
+            logger.info(f"❌ Not found at: {script_path}")
+    
+    # List what's actually in the current directory
+    logger.info("Contents of current directory:")
+    try:
+        for item in Path.cwd().iterdir():
+            logger.info(f"  {item}")
+    except Exception as e:
+        logger.error(f"Could not list directory: {e}")
     
     return None
 
@@ -136,13 +152,23 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
         
         logger.info(f"Running: {' '.join(cmd)}")
         
-        # Run the command with timeout
+        # Set environment variables for headless operation
+        env = os.environ.copy()
+        env.update({
+            'SDL_AUDIODRIVER': 'dummy',
+            'PULSE_RUNTIME_PATH': '/dev/null',
+            'ALSA_NODEV': '1',
+            'DISPLAY': ':0.0'  # Dummy display
+        })
+        
+        # Run the command with timeout and headless environment
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=120,  # 2 minutes timeout
-            cwd=kokoro_script.parent
+            cwd=kokoro_script.parent,
+            env=env  # Use headless environment
         )
         
         # Clean up input file
@@ -200,6 +226,8 @@ async def generate_speech(request: TTSRequest):
         if len(request.text) > 5000:
             raise HTTPException(status_code=400, detail="Text too long (max 5000 characters)")
         
+        logger.info(f"Generating speech for text: '{request.text[:50]}...' with voice: {request.voice}")
+        
         # Generate speech
         success, message, output_file = run_kokoro_tts(
             text=request.text,
@@ -209,21 +237,35 @@ async def generate_speech(request: TTSRequest):
         )
         
         if success and output_file:
-            # Return the audio file directly
-            filename = Path(output_file).name
-            return FileResponse(
-                path=output_file,
-                media_type="audio/mpeg" if request.format == "mp3" else "audio/wav",
-                filename=filename
-            )
+            # Check if file actually exists and has content
+            output_path = Path(output_file)
+            if output_path.exists():
+                file_size = output_path.stat().st_size
+                logger.info(f"Generated audio file size: {file_size} bytes")
+                
+                if file_size > 0:
+                    # Return the audio file directly
+                    filename = output_path.name
+                    return FileResponse(
+                        path=output_file,
+                        media_type="audio/mpeg" if request.format == "mp3" else "audio/wav",
+                        filename=filename
+                    )
+                else:
+                    logger.error("Generated audio file is empty")
+                    raise HTTPException(status_code=500, detail="Generated audio file is empty")
+            else:
+                logger.error("Generated audio file does not exist")
+                raise HTTPException(status_code=500, detail="Generated audio file does not exist")
         else:
-            raise HTTPException(status_code=500, detail=message)
+            logger.error(f"TTS generation failed: {message}")
+            raise HTTPException(status_code=500, detail=f"TTS generation failed: {message}")
             
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in generate_speech: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 @app.get("/voices")
 async def list_voices():
