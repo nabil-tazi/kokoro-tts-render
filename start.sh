@@ -30,7 +30,9 @@ pip install --no-cache-dir \
     scipy \
     "kokoro-onnx>=0.4.4" \
     ebooklib \
-    PyMuPDF
+    PyMuPDF \
+    beautifulsoup4 \
+    lxml
 
 # Install a dummy sounddevice that won't crash
 echo "🎵 Installing dummy sounddevice for headless operation..."
