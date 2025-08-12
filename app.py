@@ -152,23 +152,13 @@ def run_kokoro_tts(text: str, voice: str, speed: float, output_format: str) -> t
         
         logger.info(f"Running: {' '.join(cmd)}")
         
-        # Set environment variables for headless operation
-        env = os.environ.copy()
-        env.update({
-            'SDL_AUDIODRIVER': 'dummy',
-            'PULSE_RUNTIME_PATH': '/dev/null',
-            'ALSA_NODEV': '1',
-            'DISPLAY': ':0.0'  # Dummy display
-        })
-        
-        # Run the command with timeout and headless environment
+        # Run the command with timeout (no special environment needed now)
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=120,  # 2 minutes timeout
-            cwd=kokoro_script.parent,
-            env=env  # Use headless environment
+            cwd=kokoro_script.parent
         )
         
         # Clean up input file

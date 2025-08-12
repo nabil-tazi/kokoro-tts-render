@@ -18,8 +18,8 @@ else
     git pull
 fi
 
-# Install Kokoro TTS dependencies with headless audio support
-echo "🐍 Installing Kokoro TTS dependencies (headless mode)..."
+# Install Kokoro TTS dependencies
+echo "🐍 Installing Kokoro TTS dependencies..."
 pip install --no-cache-dir \
     torch \
     torchaudio \
@@ -32,13 +32,32 @@ pip install --no-cache-dir \
     ebooklib \
     PyMuPDF
 
-# Install sounddevice without PortAudio (headless)
-echo "🎵 Installing audio dependencies for headless environment..."
-pip install --no-cache-dir sounddevice --no-deps || echo "sounddevice install failed, continuing..."
+# Install a dummy sounddevice that won't crash
+echo "🎵 Installing dummy sounddevice for headless operation..."
+cat > dummy_sounddevice.py << 'EOF'
+"""Dummy sounddevice module for headless operation"""
 
-# Try alternative approach - set environment variables to disable audio
-export SDL_AUDIODRIVER=dummy
-export PULSE_RUNTIME_PATH=/dev/null
+def play(*args, **kwargs):
+    """Dummy play function that does nothing"""
+    print("sounddevice.play() called but disabled in headless mode")
+    pass
+
+def wait(*args, **kwargs):
+    """Dummy wait function"""
+    pass
+
+def query_devices(*args, **kwargs):
+    """Return empty device list"""
+    return []
+
+# Add any other sounddevice functions that might be used
+default_device = None
+EOF
+
+# Replace the real sounddevice with our dummy
+mv dummy_sounddevice.py "$(python -c 'import site; print(site.getsitepackages()[0])')/sounddevice.py"
+
+echo "✅ Installed dummy sounddevice module"
 
 # Download model files
 echo "🧠 Downloading AI models (this may take a few minutes)..."
@@ -72,53 +91,9 @@ fi
 # Make the script executable
 chmod +x kokoro-tts
 
-# Patch the kokoro-tts script to work in headless mode
-echo "🔧 Patching Kokoro TTS for headless operation..."
-if [ -f "kokoro-tts" ]; then
-    # Create a backup
-    cp kokoro-tts kokoro-tts.backup
-    
-    # Try to patch the sounddevice import to be optional
-    cat > patch_kokoro.py << 'EOF'
-import re
-
-# Read the file
-with open('kokoro-tts', 'r') as f:
-    content = f.read()
-
-# Replace sounddevice import to make it optional
-content = re.sub(
-    r'import sounddevice as sd',
-    '''try:
-    import sounddevice as sd
-except OSError:
-    print("Warning: sounddevice not available, streaming disabled")
-    sd = None''',
-    content
-)
-
-# Replace sd usage to check if it's available
-content = re.sub(
-    r'sd\.play\(',
-    'sd.play( if sd else None and (',
-    content
-)
-
-# Write back
-with open('kokoro-tts', 'w') as f:
-    f.write(content)
-
-print("Kokoro TTS patched for headless operation")
-EOF
-
-    python patch_kokoro.py || echo "Patching failed, using original"
-fi
-
 # Quick test (don't fail if it doesn't work perfectly)
 echo "🧪 Quick test of Kokoro TTS..."
 echo "Test" > test.txt
-export SDL_AUDIODRIVER=dummy
-export PULSE_RUNTIME_PATH=/dev/null
 if timeout 30 ./kokoro-tts test.txt test_output.mp3 --voice=af_sarah --format=mp3 2>/dev/null; then
     if [ -f "test_output.mp3" ] && [ -s "test_output.mp3" ]; then
         echo "✅ Kokoro TTS test successful!"
